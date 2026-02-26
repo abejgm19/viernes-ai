@@ -1,21 +1,47 @@
-const express = require("express");
-const app = express();
+import express from "express";
+import OpenAI from "openai";
 
+const app = express();
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Viernes está funcionando");
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-app.post("/chat", (req, res) => {
-  const mensaje = req.body.mensaje;
+app.get("/", (req, res) => {
+  res.send("Viernes está vivo y listo para aprender.");
+});
 
-  res.json({
-    respuesta: "Hola, soy Viernes. Recibí tu mensaje: " + mensaje
-  });
+app.post("/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "Eres Viernes, un asistente personal inteligente, organizado, confiable y muy útil para la vida diaria.",
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+    });
+
+    res.json({
+      reply: completion.choices[0].message.content,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error en Viernes");
+  }
 });
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
-  console.log("Servidor de Viernes activo");
+  console.log("Viernes está funcionando en el puerto", PORT);
 });
