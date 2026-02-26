@@ -1,7 +1,10 @@
 import express from "express";
 import OpenAI from "openai";
+import cors from "cors";
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
 const client = new OpenAI({
@@ -22,7 +25,7 @@ app.post("/chat", async (req, res) => {
         {
           role: "system",
           content:
-            "Eres Viernes, un asistente personal inteligente, organizado, confiable y muy útil para la vida diaria.",
+            "Eres Viernes, un asistente personal inteligente que ayuda a organizar la vida del usuario.",
         },
         {
           role: "user",
