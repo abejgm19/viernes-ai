@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Configuración del cliente de WhatsApp
+// Configuración para que funcione en Railway
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -17,39 +17,41 @@ const client = new Client({
     }
 });
 
-// Generar el código QR en los logs de Railway
+// Esto mostrará el QR en los Logs de Railway para que lo escanees
 client.on('qr', (qr) => {
-    console.log('--- ESCANEA ESTE CÓDIGO CON WHATSAPP ---');
+    console.log('--- IZUMI, ESCANEA ESTE CÓDIGO CON TU WHATSAPP ---');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
-    console.log('¡Viernes está en línea en WhatsApp!');
+    console.log('¡Viernes está conectado a WhatsApp y listo!');
 });
 
-// Lógica de respuesta automática
+// Responder mensajes de WhatsApp
 client.on('message', async (msg) => {
-    // Evita responder en grupos para mayor privacidad
-    if (!msg.from.includes('@g.us')) {
+    if (!msg.from.includes('@g.us')) { // No responde en grupos
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [
-                    { role: "system", content: "Eres Viernes, el asistente personal de Izumi. Eres inteligente, leal y eficiente." },
+                    { role: "system", content: "Eres Viernes, el asistente personal de Izumi. Eres inteligente y directo." },
                     { role: "user", content: msg.body }
                 ],
-                model: "llama-3.3-70b-versatile",
+                // Usamos el nuevo modelo porque el anterior fue retirado
+                model: "llama-3.3-70b-versatile", 
             });
             msg.reply(chatCompletion.choices[0].message.content);
         } catch (error) {
-            console.error("Error en Groq:", error.message);
+            console.error("Error en la IA:", error.message);
         }
     }
 });
 
 client.initialize();
 
-// Mantener la web viva
-app.get('/', (req, res) => res.send('<h1>Viernes está conectado a WhatsApp</h1>'));
+// Página de confirmación web
+app.get('/', (req, res) => {
+    res.send('<h1>Viernes está activo. Revisa los logs de Railway para el QR.</h1>');
+});
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Servidor activo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
