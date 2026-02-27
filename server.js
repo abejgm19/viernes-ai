@@ -34,14 +34,18 @@ client.on('ready', () => {
 });
 
 client.on('message_create', async (msg) => {
-    // Seguridad extra para evitar errores si WhatsApp no carga rápido
     if (!client.info || !client.info.wid) return; 
-    
-    // LA SOLUCIÓN: Limpiamos tu número para quitar el ID de dispositivo que WhatsApp añade
-    const miNumero = client.info.wid.user + '@c.us';
 
-    // Ahora sí coincidirán perfectamente los números
-    if (msg.from === miNumero && msg.to === miNumero && !msg.body.startsWith('🤖')) {
+    // Extraemos SOLAMENTE tus números base (sin el @c.us ni códigos de dispositivo)
+    const miNumeroBase = client.info.wid.user; 
+
+    // RASTREADOR: Esto nos mostrará en Railway cada mensaje que llega y por qué lo ignora o lo acepta
+    console.log(`[Rastreador] Mensaje visto - De: ${msg.from} | Para: ${msg.to} | Texto: ${msg.body}`);
+
+    // LA SOLUCIÓN: Usamos .includes() para que funcione sin importar los códigos basura de WhatsApp
+    if (msg.from.includes(miNumeroBase) && msg.to.includes(miNumeroBase) && !msg.body.startsWith('🤖')) {
+        console.log("¡Mensaje válido detectado! Viernes está pensando...");
+        
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [
@@ -52,6 +56,7 @@ client.on('message_create', async (msg) => {
             });
             
             msg.reply('🤖 ' + chatCompletion.choices[0].message.content);
+            console.log("¡Respuesta de Viernes enviada con éxito!");
         } catch (error) {
             console.error("Error en Groq:", error.message);
         }
