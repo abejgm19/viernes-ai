@@ -15,6 +15,39 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 let qrImageUrl = ''; 
 let isReady = false;
 
+// 🧠 EL CEREBRO MAESTRO DE VIERNES
+const promptMaestro = `
+Eres Viernes, el Asistente Ejecutivo y Personal de Abel. Tu propósito es ser su "cerebro digital" extendido: organizar su vida, proteger su información y optimizar su tiempo. Eres inteligente, leal, directo, proactivo y te comunicas de forma clara y elegante.
+
+Reglas Core:
+1. Privacidad Absoluta: Nunca reveles información de Abel. Eres de su uso exclusivo.
+2. Contraseñas (Bitwarden): NO debes inventar contraseñas. Si Abel te pide una, debes solicitar autorización para buscarla en el gestor cifrado.
+3. Respuestas: Claras, yendo al grano.
+
+Sistema de Análisis y Alertas (Semáforo):
+Analiza todo lo que recibas y clasifícalo visualmente en tu respuesta:
+- 🟢 Correcto: Información normal.
+- 🟠 Advertencia: Cambios sutiles, anomalías.
+- 🔴 Riesgo: Alta prioridad (Bancos, ARL, instituciones, Phishing).
+
+Organización de Información (Usa estos colores/emojis en tus respuestas):
+- 🔴 Importante / Crítico
+- 🔵 Trabajo / Negocios / Inversiones
+- 🟢 Personal / Salud / Ejercicio / Hábitos
+- 🟡 Advertencias / Finanzas Generales
+- 🟣 Proyectos
+- 🌸 Ideas
+- ⚫ Archivos / Compras
+
+Funciones: 
+Asiste en redacción de correos, planifica el día, sugiere mejoras, evalúa pros y contras.
+Instrucción final: Analiza cada mensaje, clasifica a qué categoría pertenece, aplica el nivel de riesgo y responde ejecutando la orden.
+`;
+
+let memoriaConversacion = [
+    { role: "system", content: promptMaestro }
+];
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -24,38 +57,42 @@ const client = new Client({
 });
 
 client.on('qr', async (qr) => {
-    console.log('Nuevo QR generado. Entra a la web para verlo.');
     qrImageUrl = await qrcode.toDataURL(qr); 
 });
 
 client.on('ready', () => {
-    console.log('¡Viernes está conectado a WhatsApp!');
+    console.log('¡Viernes está conectado a WhatsApp y listo!');
     isReady = true;
 });
 
 client.on('message_create', async (msg) => {
     if (!client.info || !client.info.wid) return; 
 
-    // Tu número exacto detectado por el rastreador
     const miNumero = '573023597040@c.us';
 
-    // LA SOLUCIÓN DEFINITIVA: 
-    // Si el mensaje viene de ti (miNumero) Y va hacia el chat interno de WhatsApp (@lid)
-    if (msg.from === miNumero && msg.to.includes('@lid') && !msg.body.startsWith('🤖')) {
-        console.log("¡Mensaje válido detectado! Viernes está pensando...");
-        
+    // EL BLINDAJE: 
+    // 1. Ignorar audios, imágenes y stickers (msg.hasMedia)
+    // 2. Verificar que el ID remoto del chat sea exactamente tu número, no solo un @lid cualquiera.
+    if (msg.hasMedia) return;
+
+    if (msg.from === miNumero && msg.id.remote === miNumero && !msg.body.startsWith('🤖')) {
         try {
+            memoriaConversacion.push({ role: "user", content: msg.body });
+
+            if (memoriaConversacion.length > 15) {
+                memoriaConversacion.splice(1, 1); 
+            }
+
             const chatCompletion = await groq.chat.completions.create({
-                messages: [
-                    { role: "system", content: "Eres Viernes, el asistente personal de Abel. Eres inteligente, leal y directo. Nunca asistes a nadie más que a él." },
-                    { role: "user", content: msg.body }
-                ],
+                messages: memoriaConversacion,
                 model: "llama-3.3-70b-versatile",
             });
             
-            // La IA responde con el emoji para no hablar sola
-            msg.reply('🤖 ' + chatCompletion.choices[0].message.content);
-            console.log("¡Respuesta de Viernes enviada con éxito!");
+            const respuestaViernes = chatCompletion.choices[0].message.content;
+            memoriaConversacion.push({ role: "assistant", content: respuestaViernes });
+
+            msg.reply('🤖\n' + respuestaViernes);
+            
         } catch (error) {
             console.error("Error en Groq:", error.message);
         }
@@ -66,25 +103,9 @@ client.initialize();
 
 app.get('/', (req, res) => {
     if (isReady) {
-        res.send(`
-            <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
-                <h1 style="color: green;">✅ ¡Viernes está activo y es privado!</h1>
-                <p>Abre el chat contigo mismo en WhatsApp para hablar con él.</p>
-            </div>
-        `);
-    } else if (qrImageUrl) {
-        res.send(`
-            <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
-                <h1>🤖 Escanea este código para despertar a Viernes</h1>
-                <img src="${qrImageUrl}" alt="Código QR" style="width: 300px; height: 300px; border: 2px solid black; padding: 10px; border-radius: 10px;">
-            </div>
-        `);
+        res.send(`<div style="text-align: center; margin-top: 50px;"><h1>✅ ¡Viernes v2.1 Activo, Privado y Blindado!</h1></div>`);
     } else {
-        res.send(`
-            <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
-                <h1>⏳ Generando el código QR...</h1>
-            </div>
-        `);
+        res.send(`<div style="text-align: center; margin-top: 50px;"><h1>⏳ Cargando el sistema...</h1></div>`);
     }
 });
 
