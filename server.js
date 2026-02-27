@@ -13,11 +13,14 @@ app.use(cors());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 🔐 CONEXIÓN A GOOGLE SHEETS
+// 🔐 CONEXIÓN A GOOGLE SHEETS (CON PARCHE PARA EL ERROR 1E08010C)
 const auth = new google.auth.GoogleAuth({
     credentials: {
         client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : '',
+        // Limpiamos la llave de comillas extra y restauramos los saltos de línea (\n)
+        private_key: process.env.GOOGLE_PRIVATE_KEY 
+            ? process.env.GOOGLE_PRIVATE_KEY.replace(/^"(.*)"$/, '$1').replace(/\\n/g, '\n') 
+            : '',
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
@@ -27,43 +30,62 @@ const spreadsheetId = process.env.SPREADSHEET_ID;
 let qrImageUrl = ''; 
 let isReady = false;
 
+// 🧠 EL CEREBRO DE VIERNES
+const promptMaestro = `Eres Viernes, el Asistente Ejecutivo de Abel. Usa emojis 🔴🔵🟢🟡🟣 según la importancia.`;
+
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: { handleSIGTERM: false, args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: { 
+        handleSIGTERM: false, 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    }
 });
 
 client.on('qr', async (qr) => { qrImageUrl = await qrcode.toDataURL(qr); });
 
 client.on('ready', () => { 
-    console.log('¡Viernes está conectado y listo para la prueba!'); 
+    console.log('¡Viernes está en línea y conectado!'); 
     isReady = true; 
 });
 
-// --- AQUÍ ESTÁ EL CAMBIO IMPORTANTE: EL DETECTOR DE EMERGENCIA ---
+// 🧠 FUNCIÓN PARA GUARDAR EN LA BASE DE DATOS
+async function guardarEnExcel(mensajeUsuario, respuestaViernes) {
+    try {
+        const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'Sheet1!A:C', // Asegúrate que tu pestaña se llame Sheet1
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [[fecha, mensajeUsuario, respuestaViernes]] }
+        });
+        console.log("✅ Dato guardado en el Cerebro Permanente");
+    } catch (error) {
+        console.error("❌ Error al guardar en Excel:", error.message);
+    }
+}
+
 client.on('message_create', async (msg) => {
-    // 🔍 SENSOR: Esto imprimirá en Railway quién manda el mensaje
-    console.log(`LOG DE EMERGENCIA: Recibido de ${msg.from} para ${msg.to}. Cuerpo: ${msg.body}`);
-
-    // Solo respondemos si NO es un mensaje que nosotros mismos enviamos (evita bucles)
-    if (!msg.body.startsWith('🤖') && !msg.hasMedia) {
+    // Solo responde a tus mensajes directos para evitar hablar con otros
+    const miNumero = '573023597040@c.us';
+    
+    if (msg.from === miNumero && msg.to === miNumero && !msg.body.startsWith('🤖') && !msg.hasMedia) {
         try {
-            console.log("Procesando mensaje de prueba...");
-            
-            // 1. Intentamos responder directamente a quien sea que escriba
-            await client.sendMessage(msg.from, "🤖 ¡Te escucho fuerte y claro! Intentando guardar en Excel...");
-            
-            // 2. Intentamos escribir en el Excel
-            const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
-            await sheets.spreadsheets.values.append({
-                spreadsheetId,
-                range: 'A:C',
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [[fecha, msg.body, "Prueba de emergencia exitosa"]] }
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { role: "system", content: promptMaestro },
+                    { role: "user", content: msg.body }
+                ],
+                model: "llama-3.3-70b-versatile",
             });
-            console.log("✅ Escrito en Excel correctamente");
-
+            
+            const respuestaViernes = chatCompletion.choices[0].message.content;
+            await msg.reply('🤖\n' + respuestaViernes);
+            
+            // Guardar en Excel
+            guardarEnExcel(msg.body, respuestaViernes);
+            
         } catch (error) {
-            console.error("❌ Error en el proceso:", error.message);
+            console.error("Error en el proceso:", error.message);
         }
     }
 });
@@ -71,10 +93,10 @@ client.on('message_create', async (msg) => {
 client.initialize();
 
 app.get('/', (req, res) => {
-    if (isReady) res.send("<h1>Viernes ONLINE (Modo Emergencia)</h1>");
-    else if (qrImageUrl) res.send(`<img src="${qrImageUrl}">`);
-    else res.send("<h1>Cargando...</h1>");
+    if (isReady) res.send("<h1>Viernes v3.3 ONLINE</h1>");
+    else if (qrImageUrl) res.send(`<img src="${qrImageUrl}" style="width:300px;">`);
+    else res.send("<h1>Iniciando sistema...</h1>");
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
