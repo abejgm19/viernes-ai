@@ -1,15 +1,2 @@
-{
-  "name": "viernes-ai",
-  "version": "1.0.0",
-  "description": "Asistente personal Viernes",
-  "type": "module",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "openai": "^4.56.0",
-    "cors": "^2.8.5"
-  }
-}
+const { Grop } = require("grop"); // según librería oficial de Grop
+const grop = new Grop({ apiKey: process.env.GROP_API_KEY });
