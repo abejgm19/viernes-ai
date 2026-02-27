@@ -3,11 +3,13 @@ const qrcode = require('qrcode');
 const Groq = require('groq-sdk');
 const express = require('express');
 const dotenv = require('dotenv');
+const cors = require('cors');
 const { google } = require('googleapis');
 
 dotenv.config();
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -31,53 +33,37 @@ const client = new Client({
 });
 
 client.on('qr', async (qr) => { qrImageUrl = await qrcode.toDataURL(qr); });
+
 client.on('ready', () => { 
-    console.log('--- SISTEMA LISTO ---');
-    console.log('Viernes está esperando mensajes...');
+    console.log('¡Viernes está conectado y listo para la prueba!'); 
     isReady = true; 
 });
 
-// 🧠 FUNCIÓN PARA GUARDAR EN EXCEL (CON LOGS DE ERROR DETALLADOS)
-async function guardarEnExcel(mensaje, respuesta) {
-    try {
-        const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
-        await sheets.spreadsheets.values.append({
-            spreadsheetId,
-            range: 'A:C', 
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [[fecha, mensaje, respuesta]] }
-        });
-        console.log("✅ ¡Dato guardado en Excel exitosamente!");
-    } catch (error) {
-        console.error("❌ ERROR CRÍTICO DE EXCEL:", error.message);
-    }
-}
-
+// --- AQUÍ ESTÁ EL CAMBIO IMPORTANTE: EL DETECTOR DE EMERGENCIA ---
 client.on('message_create', async (msg) => {
-    // 🔍 EL SENSOR: Copia lo que salga aquí en los logs de Railway
-    console.log(`[RASTRADORE] Mensaje de: ${msg.from} | Para: ${msg.to} | ID: ${msg.id.remote}`);
+    // 🔍 SENSOR: Esto imprimirá en Railway quién manda el mensaje
+    console.log(`LOG DE EMERGENCIA: Recibido de ${msg.from} para ${msg.to}. Cuerpo: ${msg.body}`);
 
-    // Si tú le escribes a Viernes o te escribes a ti mismo, esto debería activarse
+    // Solo respondemos si NO es un mensaje que nosotros mismos enviamos (evita bucles)
     if (!msg.body.startsWith('🤖') && !msg.hasMedia) {
         try {
-            console.log(`Procesando mensaje de Abel: ${msg.body}`);
+            console.log("Procesando mensaje de prueba...");
             
-            const chatCompletion = await groq.chat.completions.create({
-                messages: [{ role: "system", content: "Eres Viernes, asistente de Abel. Usa emojis." }, { role: "user", content: msg.body }],
-                model: "llama-3.3-70b-versatile",
+            // 1. Intentamos responder directamente a quien sea que escriba
+            await client.sendMessage(msg.from, "🤖 ¡Te escucho fuerte y claro! Intentando guardar en Excel...");
+            
+            // 2. Intentamos escribir en el Excel
+            const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+            await sheets.spreadsheets.values.append({
+                spreadsheetId,
+                range: 'A:C',
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [[fecha, msg.body, "Prueba de emergencia exitosa"]] }
             });
-            
-            const respuestaViernes = chatCompletion.choices[0].message.content;
-            
-            // Intentar responder
-            await client.sendMessage(msg.from, '🤖\n' + respuestaViernes);
-            console.log("✅ Respuesta enviada a WhatsApp");
+            console.log("✅ Escrito en Excel correctamente");
 
-            // Guardar en Excel
-            await guardarEnExcel(msg.body, respuestaViernes);
-            
         } catch (error) {
-            console.error("❌ ERROR EN PROCESAMIENTO:", error.message);
+            console.error("❌ Error en el proceso:", error.message);
         }
     }
 });
@@ -85,7 +71,7 @@ client.on('message_create', async (msg) => {
 client.initialize();
 
 app.get('/', (req, res) => {
-    if (isReady) res.send("<h1>Viernes v3.2 ONLINE</h1>");
+    if (isReady) res.send("<h1>Viernes ONLINE (Modo Emergencia)</h1>");
     else if (qrImageUrl) res.send(`<img src="${qrImageUrl}">`);
     else res.send("<h1>Cargando...</h1>");
 });
