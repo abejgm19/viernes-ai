@@ -33,24 +33,24 @@ client.on('ready', () => {
     isReady = true;
 });
 
-// Usamos 'message_create' para leer los mensajes que tú envías
 client.on('message_create', async (msg) => {
-    // Obtenemos tu número exacto de WhatsApp
-    const miNumero = client.info.wid._serialized;
+    // Seguridad extra para evitar errores si WhatsApp no carga rápido
+    if (!client.info || !client.info.wid) return; 
+    
+    // LA SOLUCIÓN: Limpiamos tu número para quitar el ID de dispositivo que WhatsApp añade
+    const miNumero = client.info.wid.user + '@c.us';
 
-    // REGLA DE ORO: Solo interactuar en el chat "Contigo mismo" y evitar que se responda a sí mismo
+    // Ahora sí coincidirán perfectamente los números
     if (msg.from === miNumero && msg.to === miNumero && !msg.body.startsWith('🤖')) {
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [
-                    // Aquí arreglamos el nombre: ahora sabe que eres Abel
                     { role: "system", content: "Eres Viernes, el asistente personal de Abel. Eres inteligente, leal y directo. Nunca asistes a nadie más que a él." },
                     { role: "user", content: msg.body }
                 ],
                 model: "llama-3.3-70b-versatile",
             });
             
-            // Viernes firma con un 🤖 para distinguirse de ti
             msg.reply('🤖 ' + chatCompletion.choices[0].message.content);
         } catch (error) {
             console.error("Error en Groq:", error.message);
