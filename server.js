@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode'); // Nueva librería para imágenes
+const qrcode = require('qrcode'); 
 const Groq = require('groq-sdk');
 const express = require('express');
 const dotenv = require('dotenv');
@@ -12,7 +12,7 @@ app.use(cors());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-let qrImageUrl = ''; // Aquí guardaremos la foto del QR
+let qrImageUrl = ''; 
 let isReady = false;
 
 const client = new Client({
@@ -23,10 +23,9 @@ const client = new Client({
     }
 });
 
-// Cuando WhatsApp pida el QR, lo convertimos a foto
 client.on('qr', async (qr) => {
     console.log('Nuevo QR generado. Entra a la web para verlo.');
-    qrImageUrl = await qrcode.toDataURL(qr); // Crea la imagen
+    qrImageUrl = await qrcode.toDataURL(qr); 
 });
 
 client.on('ready', () => {
@@ -34,17 +33,25 @@ client.on('ready', () => {
     isReady = true;
 });
 
-client.on('message', async (msg) => {
-    if (!msg.from.includes('@g.us')) {
+// Usamos 'message_create' para leer los mensajes que tú envías
+client.on('message_create', async (msg) => {
+    // Obtenemos tu número exacto de WhatsApp
+    const miNumero = client.info.wid._serialized;
+
+    // REGLA DE ORO: Solo interactuar en el chat "Contigo mismo" y evitar que se responda a sí mismo
+    if (msg.from === miNumero && msg.to === miNumero && !msg.body.startsWith('🤖')) {
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [
-                    { role: "system", content: "Eres Viernes, el asistente personal de Izumi. Eres inteligente y directo." },
+                    // Aquí arreglamos el nombre: ahora sabe que eres Abel
+                    { role: "system", content: "Eres Viernes, el asistente personal de Abel. Eres inteligente, leal y directo. Nunca asistes a nadie más que a él." },
                     { role: "user", content: msg.body }
                 ],
                 model: "llama-3.3-70b-versatile",
             });
-            msg.reply(chatCompletion.choices[0].message.content);
+            
+            // Viernes firma con un 🤖 para distinguirse de ti
+            msg.reply('🤖 ' + chatCompletion.choices[0].message.content);
         } catch (error) {
             console.error("Error en Groq:", error.message);
         }
@@ -53,29 +60,25 @@ client.on('message', async (msg) => {
 
 client.initialize();
 
-// LA MAGIA: Tu página web ahora mostrará la foto del QR
 app.get('/', (req, res) => {
     if (isReady) {
         res.send(`
             <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
-                <h1 style="color: green;">✅ ¡Viernes está conectado a WhatsApp!</h1>
-                <p>Ya puedes enviarle mensajes desde tu celular.</p>
+                <h1 style="color: green;">✅ ¡Viernes está activo y es privado!</h1>
+                <p>Abre el chat contigo mismo en WhatsApp para hablar con él.</p>
             </div>
         `);
     } else if (qrImageUrl) {
         res.send(`
             <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
                 <h1>🤖 Escanea este código para despertar a Viernes</h1>
-                <p>Abre WhatsApp en tu celular > Dispositivos vinculados > Vincular dispositivo</p>
                 <img src="${qrImageUrl}" alt="Código QR" style="width: 300px; height: 300px; border: 2px solid black; padding: 10px; border-radius: 10px;">
-                <p style="color: gray;"><i>Si no funciona a la primera, refresca esta página para cargar un código nuevo.</i></p>
             </div>
         `);
     } else {
         res.send(`
             <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
                 <h1>⏳ Generando el código QR...</h1>
-                <p>Por favor, espera unos 15 segundos y <b>refresca esta página</b>.</p>
             </div>
         `);
     }
